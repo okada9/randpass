@@ -108,7 +108,7 @@ fn report_entropy(
     quiet: bool,
     fail: bool,
 ) -> Result<(), Error> {
-    let entropy = calculate_entropy(password_length, criteria, Some(extra_charset)).unwrap();
+    let entropy = calculate_entropy(password_length, criteria, Some(extra_charset))?;
 
     if entropy >= ENTROPY_THRESHOLD && verbose {
         print_info(&format!("your password has {:.2} bits of entropy", entropy));
