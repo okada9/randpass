@@ -5,13 +5,7 @@ fn main() {
     let criteria = PasswordCriteria::Alphanumeric;
     let extra_charset = b"!@#$%";
     let base_charset = create_charset(&criteria, Some(extra_charset)).unwrap();
-    let password = create_password(
-        password_length,
-        &base_charset,
-        &criteria,
-        Some(extra_charset),
-    )
-    .unwrap();
+    let password = create_password(password_length, &base_charset, Some(extra_charset)).unwrap();
 
     println!("{}", password);
 }

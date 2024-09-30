@@ -208,15 +208,11 @@ fn run() -> Result<(), Error> {
             i == args.password_quantity - 1,
             args.no_newline,
         );
-        let password = match create_password(
-            args.password_length,
-            &base_charset,
-            &criteria,
-            Some(&extra_charset),
-        ) {
-            Ok(p) => p,
-            Err(_) => panic!(),
-        };
+        let password =
+            match create_password(args.password_length, &base_charset, Some(&extra_charset)) {
+                Ok(p) => p,
+                Err(_) => panic!(),
+            };
 
         match args.format_string {
             Some(ref format_string) => {

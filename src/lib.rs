@@ -77,7 +77,6 @@ fn create_charset_from_regex(pattern: &str) -> Result<Vec<u8>, Error> {
 ///
 /// - `password_length`: Length of the password.
 /// - `base_charset`: Base character set.
-/// - `criteria`: Password criteria.
 /// - `extra_charset`: Extra character set.
 ///
 /// # Returns
@@ -87,22 +86,10 @@ fn create_charset_from_regex(pattern: &str) -> Result<Vec<u8>, Error> {
 pub fn create_password(
     password_length: usize,
     base_charset: &[u8],
-    criteria: &PasswordCriteria,
     extra_charset: Option<&[u8]>,
 ) -> Result<String, Error> {
     let mut rng = OsRng;
     let mut password_chars = extra_charset.unwrap_or(&[]).to_owned();
-
-    if criteria == &PasswordCriteria::AllPrintableChars {
-        let special_chars: Vec<u8> = (b' '..=b'~')
-            .filter(|c: &u8| !c.is_ascii_alphanumeric())
-            .collect();
-
-        if let Some(&special_char) = special_chars.choose(&mut rng) {
-            password_chars.push(special_char);
-        }
-    }
-
     let remaining_length = password_length.saturating_sub(password_chars.len());
 
     password_chars.extend((0..remaining_length).map(|_| {
@@ -240,26 +227,8 @@ mod tests {
     #[test]
     fn test_create_password_length() {
         let charset = b"abcdefg";
-        let password = create_password(10, charset, &PasswordCriteria::Alphanumeric, None)
-            .ok()
-            .unwrap();
+        let password = create_password(10, charset, None).ok().unwrap();
         assert_eq!(password.len(), 10);
-    }
-
-    #[test]
-    fn test_create_password_with_special_chars() {
-        let length = 10;
-        let charset = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        let special_chars: Vec<u8> = (b' '..=b'~')
-            .filter(|c: &u8| !c.is_ascii_alphanumeric())
-            .collect();
-        let password = create_password(length, charset, &PasswordCriteria::AllPrintableChars, None)
-            .ok()
-            .unwrap();
-
-        assert!(special_chars
-            .iter()
-            .any(|c| password.contains(char::from(*c))));
     }
 
     #[test]
@@ -267,14 +236,9 @@ mod tests {
         let length = 10;
         let extra_charset = b"!@#$%";
         let charset = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        let password = create_password(
-            length,
-            charset,
-            &PasswordCriteria::Alphanumeric,
-            Some(extra_charset),
-        )
-        .ok()
-        .unwrap();
+        let password = create_password(length, charset, Some(extra_charset))
+            .ok()
+            .unwrap();
 
         assert!(extra_charset
             .iter()
