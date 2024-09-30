@@ -2,6 +2,13 @@
 name = "randpass"
 edition = "2021"
 
+description = "Secure password generator featuring a customizable character set, entropy calculation, and more."
+license = "MIT"
+authors = ["Hiroki Okada <okada9@proton.me>"]
+repository = "https://github.com/okada9/randpass"
+documentation = "https://docs.rs/randpass"
+keywords = ["password", "password-generator"]
+
 [dependencies]
 clap = { version = "4.5.18", features = ["derive"] }
 crossterm = "0.28.1"
