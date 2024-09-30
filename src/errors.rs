@@ -1,12 +1,26 @@
 use std::fmt;
 
+/// Represents errors that can occur during password generation.
 #[derive(Debug)]
 pub enum Error {
+    /// A generic error variant.
     Default,
+
+    /// The provided regex pattern is invalid.
     InvalidRegex,
+
+    /// No characters match the given criteria.
     NoValidChars,
+
+    /// Indicates insufficient password entropy, with the calculated
+    /// entropy value.
     PasswordEntropyInsufficient(f64),
+
+    /// The regex pattern matches no characters.
     RegexMatchesNoChars,
+
+    /// The number of extra characters is greater than the requested
+    /// password length.
     TooManyExtraChars,
 }
 

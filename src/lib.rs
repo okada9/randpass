@@ -1,6 +1,8 @@
+mod criteria;
 mod errors;
 mod util;
 
+pub use criteria::*;
 pub use errors::*;
 use util::*;
 
@@ -9,17 +11,17 @@ use rand::{rngs::OsRng, Rng};
 use regex::Regex;
 use std::collections::HashSet;
 
-#[derive(Clone, PartialEq)]
-pub enum PasswordCriteria<'a> {
-    Alphanumeric,
-    UppercaseAndDigitsOnly,
-    LowercaseAndDigitsOnly,
-    DigitsOnly,
-    AllPrintableChars,
-    BaseCharset(&'a [u8]),
-    RegexPattern(&'a str),
-}
-
+/// Creates a character set.
+///
+/// # Parameters
+///
+/// - `criteria`: Password criteria.
+/// - `extra_charset`: Extra character set.
+///
+/// # Returns
+///
+/// `Ok(Vec<u8>)` with the created character set on success;
+/// `Err(Error)` on failure.
 pub fn create_charset(
     criteria: &PasswordCriteria,
     extra_charset: Option<&[u8]>,
@@ -69,6 +71,19 @@ fn create_charset_from_regex(pattern: &str) -> Result<Vec<u8>, Error> {
     Ok(charset)
 }
 
+/// Creates a password.
+///
+/// # Parameters
+///
+/// - `password_length`: Length of the password.
+/// - `base_charset`: Base character set.
+/// - `criteria`: Password criteria.
+/// - `extra_charset`: Extra character set.
+///
+/// # Returns
+///
+/// `Ok(String)` with the generated password on success; `Err(Error)` on
+/// failure.
 pub fn create_password(
     password_length: usize,
     base_charset: &[u8],
@@ -102,12 +117,26 @@ pub fn create_password(
     Ok(password)
 }
 
+/// Calculates password entropy.
+///
+/// # Parameters
+///
+/// - `password_length`: Length of the password.
+/// - `base_charset`: Base character set.
+/// - `extra_charset`: Extra character set.
+///
+/// # Returns
+///
+/// `Some(f64)` for valid inputs; `None` otherwise.
 pub fn calculate_entropy(
     password_length: usize,
-    base_charset_size: usize,
-    extra_char_multiplicities: Option<&[usize]>,
+    base_charset: &[u8],
+    extra_charset: Option<&[u8]>,
 ) -> Option<f64> {
-    if let Some(extra_char_multiplicities) = extra_char_multiplicities {
+    let base_charset_size = base_charset.len();
+
+    if let Some(extra_charset) = extra_charset {
+        let extra_char_multiplicities = calculate_char_multiplicities(extra_charset);
         let extra_charset_size = extra_char_multiplicities.iter().sum::<usize>();
 
         if password_length < extra_charset_size {
@@ -129,14 +158,23 @@ pub fn calculate_entropy(
     }
 }
 
+/// The minimum entropy threshold for a secure password.
 pub const ENTROPY_THRESHOLD: f64 = 72.0;
 
-pub fn suggest_password_length(
-    base_charset_size: usize,
-    extra_char_multiplicities: Option<&[usize]>,
-) -> Option<usize> {
+/// Suggests the minimum length for a secure password.
+///
+/// # Parameters
+///
+/// - `base_charset`: Base character set.
+/// - `extra_charset`: Extra character set.
+///
+/// # Returns
+///
+/// `Some(usize)` with the suggested length; `None` if inputs are
+/// invalid.
+pub fn suggest_password_length(base_charset: &[u8], extra_charset: Option<&[u8]>) -> Option<usize> {
     for i in 1..1000 {
-        if let Some(entropy) = calculate_entropy(i, base_charset_size, extra_char_multiplicities) {
+        if let Some(entropy) = calculate_entropy(i, base_charset, extra_charset) {
             if entropy >= ENTROPY_THRESHOLD {
                 return Some(i);
             }
@@ -257,20 +295,25 @@ mod tests {
 
     #[test]
     fn test_calculate_entropy() {
+        let base_charset = create_charset(&PasswordCriteria::Alphanumeric, None).unwrap();
+
         assert_eq!(
-            calculate_entropy(10, 62, None),
+            calculate_entropy(10, &base_charset, None),
             Some((62 as f64).powf(10.0).log(2.0))
         );
 
         assert_eq!(
-            calculate_entropy(5, 62, Some(&vec![1, 1, 1, 1, 1])),
+            calculate_entropy(5, &base_charset, Some(b"01234")),
             Some(log2_factorial(5))
         );
 
-        assert_eq!(calculate_entropy(5, 62, Some(&vec![5])), Some(0.0));
+        assert_eq!(
+            calculate_entropy(5, &base_charset, Some(b"00000")),
+            Some(0.0)
+        );
 
         assert_eq!(
-            calculate_entropy(20, 62, Some(&vec![5, 4, 3, 2, 1])),
+            calculate_entropy(20, &base_charset, Some(b"000001111222334")),
             Some(
                 log2_binomial_coefficient(20, 15) + log2_factorial(15)
                     - log2_factorial(5)
@@ -283,7 +326,7 @@ mod tests {
         );
 
         assert_eq!(
-            calculate_entropy(10, 62, Some(&vec![1, 1, 1, 1, 1])),
+            calculate_entropy(10, &base_charset, Some(b"01234")),
             Some(
                 log2_binomial_coefficient(10, 5) + log2_factorial(5) + (62 as f64).powf(5.0).log2()
             )
@@ -292,8 +335,12 @@ mod tests {
 
     #[test]
     fn test_suggest_password_length() {
-        assert_eq!(suggest_password_length(62, None), Some(13));
+        let base_charset = create_charset(&PasswordCriteria::Alphanumeric, None).unwrap();
+        let small_base_chatset =
+            create_charset(&PasswordCriteria::BaseCharset(b"a"), None).unwrap();
 
-        assert!(suggest_password_length(1, None).is_none());
+        assert_eq!(suggest_password_length(&base_charset, None), Some(13));
+
+        assert!(suggest_password_length(&small_base_chatset, None).is_none());
     }
 }

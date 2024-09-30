@@ -108,14 +108,7 @@ fn report_entropy(
     quiet: bool,
     fail: bool,
 ) -> Result<(), Error> {
-    let base_charset_size = base_charset.len();
-    let extra_char_multiplicities = calculate_char_multiplicities(extra_charset);
-    let entropy = calculate_entropy(
-        password_length,
-        base_charset_size,
-        Some(&extra_char_multiplicities),
-    )
-    .unwrap();
+    let entropy = calculate_entropy(password_length, base_charset, Some(extra_charset)).unwrap();
 
     if entropy >= ENTROPY_THRESHOLD && verbose {
         print_info(&format!("your password has {:.2} bits of entropy", entropy));
@@ -131,9 +124,7 @@ fn report_entropy(
             ));
         }
 
-        if let Some(suggested_length) =
-            suggest_password_length(base_charset_size, Some(&extra_char_multiplicities))
-        {
+        if let Some(suggested_length) = suggest_password_length(base_charset, Some(extra_charset)) {
             print_hint(&format!(
                 "set '--length' to '{}' or longer (use '--quiet' to hide this message)",
                 suggested_length
