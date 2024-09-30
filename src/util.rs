@@ -1,9 +1,62 @@
 use crossterm::terminal::size;
-use std::borrow::Cow;
+use regex::Regex;
 use std::collections::HashMap;
 use std::io;
 use std::io::IsTerminal;
+use std::{borrow::Cow, collections::HashSet};
 use textwrap::wrap;
+
+use crate::{Error, PasswordCriteria};
+
+#[allow(dead_code)]
+pub(crate) fn create_charset(
+    criteria: &PasswordCriteria,
+    extra_charset: Option<&[u8]>,
+) -> Result<Vec<u8>, Error> {
+    let mut charset: HashSet<u8> = match criteria {
+        PasswordCriteria::Alphanumeric => Ok::<HashSet<u8>, Error>(
+            (b'0'..=b'9')
+                .chain(b'A'..=b'Z')
+                .chain(b'a'..=b'z')
+                .collect(),
+        ),
+        PasswordCriteria::UppercaseAndDigitsOnly => Ok((b'0'..=b'9').chain(b'A'..=b'Z').collect()),
+        PasswordCriteria::LowercaseAndDigitsOnly => Ok((b'0'..=b'9').chain(b'a'..=b'z').collect()),
+        PasswordCriteria::DigitsOnly => Ok((b'0'..=b'9').collect()),
+        PasswordCriteria::AllPrintableChars => Ok((b' '..=b'~').collect()),
+        PasswordCriteria::BaseCharset(chars) => Ok(HashSet::from_iter(chars.iter().cloned())),
+        PasswordCriteria::RegexPattern(p) => Ok(create_charset_from_regex(p)?
+            .into_iter()
+            .collect::<HashSet<u8>>()),
+    }?;
+
+    if let Some(extra_charset) = extra_charset {
+        charset.extend(extra_charset);
+    }
+
+    if charset.is_empty() {
+        return Err(Error::NoValidChars);
+    }
+
+    let mut charset: Vec<u8> = charset.into_iter().collect();
+
+    charset.sort();
+
+    Ok(charset)
+}
+
+fn create_charset_from_regex(pattern: &str) -> Result<Vec<u8>, Error> {
+    let regex = Regex::new(pattern).map_err(|_| Error::InvalidRegex)?;
+    let charset = (b' '..=b'~')
+        .filter(|c| regex.is_match(&(*c as char).to_string()))
+        .collect::<Vec<u8>>();
+
+    if charset.is_empty() {
+        return Err(Error::RegexMatchesNoChars);
+    }
+
+    Ok(charset)
+}
 
 #[allow(dead_code)]
 pub(crate) fn parse_escape_sequences(input: &str) -> String {
@@ -218,6 +271,67 @@ mod tests {
                 $b,
             );
         }};
+    }
+
+    #[test]
+    fn test_create_charset_with_default_config() {
+        let charset = create_charset(&PasswordCriteria::Alphanumeric, None).unwrap();
+        assert_eq!(
+            charset,
+            (b'0'..=b'9')
+                .chain(b'A'..=b'Z')
+                .chain(b'a'..=b'z')
+                .collect::<Vec<u8>>()
+        );
+    }
+
+    #[test]
+    fn test_create_charset_with_uppercase_letters_and_digits_only() {
+        let charset = create_charset(&PasswordCriteria::UppercaseAndDigitsOnly, None).unwrap();
+        assert_eq!(
+            charset,
+            (b'0'..=b'9').chain(b'A'..=b'Z').collect::<Vec<u8>>()
+        );
+    }
+
+    #[test]
+    fn test_create_charset_with_lowercase_letters_and_digits_only() {
+        let charset = create_charset(&PasswordCriteria::LowercaseAndDigitsOnly, None).unwrap();
+        assert_eq!(
+            charset,
+            (b'0'..=b'9').chain(b'a'..=b'z').collect::<Vec<u8>>()
+        );
+    }
+
+    #[test]
+    fn test_create_charset_with_digits_only() {
+        let charset = create_charset(&PasswordCriteria::DigitsOnly, None).unwrap();
+        assert_eq!(charset, (b'0'..=b'9').collect::<Vec<u8>>());
+    }
+
+    #[test]
+    fn test_create_charset_with_all_printable_chars() {
+        let charset = create_charset(&PasswordCriteria::AllPrintableChars, None).unwrap();
+        assert_eq!(charset, (b' '..=b'~').collect::<Vec<u8>>());
+    }
+
+    #[test]
+    fn test_create_charset_without_duplication() {
+        let charset =
+            create_charset(&PasswordCriteria::RegexPattern(&"[0-9]"), Some(b"00000")).unwrap();
+        assert_eq!(charset, (b'0'..=b'9').collect::<Vec<u8>>());
+    }
+
+    #[test]
+    fn test_create_charset_from_regex() {
+        let charset = create_charset_from_regex("[a-z]").unwrap();
+        assert_eq!(charset, (b'a'..=b'z').collect::<Vec<u8>>());
+    }
+
+    #[test]
+    fn test_create_charset_from_invalid_regex() {
+        let result = create_charset_from_regex("[a-z");
+        assert!(result.is_err());
     }
 
     #[test]

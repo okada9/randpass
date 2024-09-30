@@ -4,8 +4,8 @@ use util::*;
 
 use clap::Parser;
 use randpass::{
-    calculate_entropy, create_charset, create_password, suggest_password_length, Error,
-    PasswordCriteria, ENTROPY_THRESHOLD,
+    calculate_entropy, create_password, suggest_password_length, Error, PasswordCriteria,
+    ENTROPY_THRESHOLD,
 };
 use std::process;
 
@@ -101,14 +101,14 @@ struct Args {
 }
 
 fn report_entropy(
-    base_charset: &[u8],
+    criteria: &PasswordCriteria,
     extra_charset: &[u8],
     password_length: usize,
     verbose: bool,
     quiet: bool,
     fail: bool,
 ) -> Result<(), Error> {
-    let entropy = calculate_entropy(password_length, base_charset, Some(extra_charset)).unwrap();
+    let entropy = calculate_entropy(password_length, criteria, Some(extra_charset)).unwrap();
 
     if entropy >= ENTROPY_THRESHOLD && verbose {
         print_info(&format!("your password has {:.2} bits of entropy", entropy));
@@ -124,7 +124,7 @@ fn report_entropy(
             ));
         }
 
-        if let Some(suggested_length) = suggest_password_length(base_charset, Some(extra_charset)) {
+        if let Some(suggested_length) = suggest_password_length(criteria, Some(extra_charset)) {
             print_hint(&format!(
                 "set '--length' to '{}' or longer (use '--quiet' to hide this message)",
                 suggested_length
@@ -186,14 +186,9 @@ fn run() -> Result<(), Error> {
         PasswordCriteria::Alphanumeric
     };
 
-    let base_charset = match create_charset(&criteria, Some(&extra_charset)) {
-        Ok(base_charset) => base_charset,
-        Err(e) => return Err(e),
-    };
-
     if !args.quiet || args.fail {
         report_entropy(
-            &base_charset,
+            &criteria,
             &extra_charset,
             args.password_length,
             args.verbose,
@@ -208,11 +203,11 @@ fn run() -> Result<(), Error> {
             i == args.password_quantity - 1,
             args.no_newline,
         );
-        let password =
-            match create_password(args.password_length, &base_charset, Some(&extra_charset)) {
-                Ok(p) => p,
-                Err(_) => panic!(),
-            };
+        let password = match create_password(args.password_length, &criteria, Some(&extra_charset))
+        {
+            Ok(p) => p,
+            Err(_) => panic!(),
+        };
 
         match args.format_string {
             Some(ref format_string) => {
