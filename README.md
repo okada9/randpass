@@ -1,8 +1,7 @@
 # `randpass`
 
-`randpass` is a secure command-line password generator written in
-[Rust], featuring a customizable character set, entropy calculation, and
-more.
+`randpass` is a secure password generator written in [Rust], featuring a
+customizable character set, entropy calculation, and more.
 
 ## Usage
 
